@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Skill Hero — Claude 도트 비주얼라이저</title>
+<style>
+  :root{
+    --bg:#0e1320; --panel:#161d2e; --panel2:#1d2740; --line:#2c3a5c;
+    --ink:#e6ecff; --dim:#8aa0cc; --accent:#7c9cff; --claude:#d97757;
+    --good:#46e0a0; --warn:#ffd166; --bad:#ff6b6b;
+    --slot:#0b1020;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:"DejaVu Sans Mono",Consolas,"Courier New",monospace;
+    display:flex;flex-direction:column;height:100%;overflow:hidden;
+    image-rendering:pixelated;
+  }
+  header{
+    display:flex;align-items:center;gap:12px;padding:10px 14px;
+    border-bottom:2px solid var(--line);background:var(--panel);
+  }
+  header h1{font-size:15px;margin:0;letter-spacing:1px;text-transform:uppercase}
+  header h1 b{color:var(--claude)}
+  .pill{margin-left:auto;display:flex;gap:8px;align-items:center;font-size:12px}
+  .dot{width:9px;height:9px;border-radius:0;background:var(--dim);box-shadow:0 0 0 2px #0006 inset}
+  .dot.live{background:var(--good)} .dot.demo{background:var(--warn)}
+  button{
+    font-family:inherit;font-size:12px;color:var(--ink);cursor:pointer;
+    background:var(--panel2);border:2px solid var(--line);border-radius:0;
+    padding:6px 10px;text-transform:uppercase;letter-spacing:.5px;
+  }
+  button:hover{border-color:var(--accent)}
+  button.on{border-color:var(--good);color:var(--good)}
+  main{flex:1;display:flex;min-height:0}
+  /* inventory */
+  #inv{
+    width:248px;flex:none;border-right:2px solid var(--line);background:var(--panel);
+    display:flex;flex-direction:column;min-height:0;
+  }
+  .ttl{padding:8px 12px;font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--line)}
+  #items{overflow:auto;padding:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .card{
+    background:var(--panel2);border:2px solid var(--line);padding:7px 6px;text-align:center;
+    cursor:grab;user-select:none;transition:.08s;
+  }
+  .card:hover{border-color:var(--accent);transform:translateY(-2px)}
+  .card canvas{width:42px;height:42px;image-rendering:pixelated;display:block;margin:0 auto 4px}
+  .card .nm{font-size:11px;line-height:1.2}
+  .card .kd{font-size:9px;color:var(--dim);margin-top:2px}
+  .card .at{font-size:9px;color:var(--warn)}
+  /* scene */
+  #stage{flex:1;display:flex;flex-direction:column;min-width:0}
+  #scene{flex:1;width:100%;display:block;background:
+    linear-gradient(#0b1426,#0e1320 70%);cursor:default}
+  #scene.drop{outline:3px dashed var(--accent);outline-offset:-6px}
+  #loadout{border-top:2px solid var(--line);background:var(--panel);padding:8px 12px;min-height:64px}
+  #loadout .row{display:flex;gap:14px;flex-wrap:wrap}
+  .hslot{font-size:11px;color:var(--dim)}
+  .hslot b{color:var(--ink)}
+  .chips{display:inline-flex;gap:5px;flex-wrap:wrap;margin-left:6px;vertical-align:middle}
+  .chip{background:var(--slot);border:1px solid var(--line);padding:2px 6px;font-size:10px;color:var(--ink);cursor:pointer}
+  .chip:hover{border-color:var(--bad);color:var(--bad)}
+  .chip i{font-style:normal;color:var(--warn)}
+  .hint{color:var(--dim);font-size:11px}
+  @media (max-width:720px){ #inv{width:150px} #items{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚔ SKILL <b>HERO</b> — Claude 도트 비주얼라이저</h1>
+  <div class="pill">
+    <span class="dot demo" id="statusDot"></span><span id="statusTxt">DEMO</span>
+    <button id="btnLive" title="Claude 동작과 연동 (상태 파일 선택/감지)">LIVE 연결</button>
+    <button id="btnDemo" class="on">데모</button>
+  </div>
+</header>
+<main>
+  <section id="inv">
+    <div class="ttl">🎒 장비 창 — 스킬 인벤토리</div>
+    <div id="items"></div>
+    <div class="ttl" style="border-top:1px solid var(--line);border-bottom:none">
+      ↪ 카드를 용사에게 드래그해 장착
+    </div>
+  </section>
+  <section id="stage">
+    <canvas id="scene"></canvas>
+    <div id="loadout"><div class="row" id="loadoutRow"></div></div>
+  </section>
+</main>
+
+<script>
+"use strict";
+/* ---------- palette & sprites (모든 그래픽은 도트) ---------- */
+const COL={ K:"#ffd9a0",E:"#26203a",W:"#f8fafc",B:"#7c4a21",Y:"#fde047",
+  C:"#d97757",c:"#b45c3a",L:"#3a4252",O:"#26201a" };
+/* 직업별 도트 스프라이트 (키: M모자/투구, m음영, K피부, E눈, B몸통, b몸통음영, S장식, L다리, O신발) */
+const SPR={
+ knight:["  MMMM  "," MmmmmmM"," MKKKKKM"," KEKKKEK"," KKKKKKK","  SBBS  ",
+   " SBBBBS "," bBBBBb ","  BBBB  ","  L  L  ","  L  L  ","  O  O  "],
+ archer:["   MM   ","  MMMm  "," MMKKm  "," MKEKKm ","  KKKK  ","  SBBS  ",
+   " BBBBBB "," bBBBBb ","  BBBB  ","  L  L  ","  L L   ","  O  O  "],
+ mage:["   M    ","  MMM   "," MMMMM  ","  KEK   ","  KKK   ","  SBS   ",
+   " SBBBS  "," BBBBB  "," bBBBb  "," BBBBB  "," BBBBB  ","  OOO   "]
+};
+const ICONS={
+ sword:["   X   ","   X   ","   X   ","   X   ","  WXW  ","   B   ","   B   "],
+ bow:["  X "," XS "," X S"," X=A"," X S"," XS ","  X "],
+ staff:["  XXX  "," XYYYX ","  XXX  ","   B   ","   B   ","   B   ","   B   "],
+ shield:[" XXXXX ","XWXXXWX","XXXXXXX","XXXXXXX"," XXXXX ","  XXX  ","   X   "],
+ armor:[" X   X "," XXXXX ","XXXXXXX","XXXXXXX","XXXXXXX"," XXXXX ","  XXX  "]
+};
+const SKINS=["#ffd9a0","#f1bd92","#e0a878","#c69a6a","#b07a4e"];
+const CLASSES={
+ knight:{melee:true, weapon:"sword", trim:"#c8d2dc",
+   body:[["#3b82f6","#1e40af"],["#ef4444","#991b1b"],["#22c55e","#15803d"],["#eab308","#a16207"]],
+   hat:[["#c8d2dc","#7f8c99"],["#e5b7a0","#a06a52"]]},
+ archer:{melee:false, weapon:"bow", trim:"#7c4a21",
+   body:[["#16a34a","#14532d"],["#65a30d","#3f6212"],["#0d9488","#115e59"],["#b45309","#78350f"]],
+   hat:[["#15803d","#0f5132"],["#4d7c0f","#365314"]]},
+ mage:{melee:false, weapon:"staff", trim:"#fde047",
+   body:[["#7c3aed","#5b21b6"],["#2563eb","#1e3a8a"],["#db2777","#9d174d"],["#0891b2","#155e75"]],
+   hat:[["#7c3aed","#4c1d95"],["#1d4ed8","#1e3a8a"]]}
+};
+const CLASS_KEYS=["knight","archer","mage"], CLSKO={knight:"기사",archer:"궁수",mage:"법사"};
+const rnd=a=>a[Math.floor(Math.random()*a.length)];
+const WPOS={sword:[28,6],staff:[31,1],bow:[26,12]}; // 무기 종류별 손 위치
+function shade(hex,f){const n=parseInt(hex.slice(1),16);let r=(n>>16)&255,g=(n>>8)&255,b=n&255;
+  r=Math.round(r*f);g=Math.round(g*f);b=Math.round(b*f);return"#"+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);}
+const lastBy=(h,types)=>{let r=null;for(const s of h.eq)if(types.indexOf(s.ic)>=0)r=s;return r;};
+function classForAgent(name,i){
+  const n=String(name||"").toLowerCase();
+  if(/verif|review|plan|research|writ|scien|arch|analy|critic|doc|secur/.test(n))return"mage";
+  if(/explor|scout|trac|debug|search|qa|test/.test(n))return"archer";
+  if(/exec|main|team|git|simpl|build|design/.test(n))return"knight";
+  return CLASS_KEYS[i%3];
+}
+/* 클로드 인베이더 적 스프라이트 (제공 이미지 기반: 몸통 + 두 눈 + 양옆 팔 + 네 다리) */
+const CLAUDE_G=[
+"..CCCCCCCCCCCC..","..CCCCCCCCCCCC..","..CCCCCCCCCCCC..",
+"..CCWCCCCCCWCC..","..CCWCCCCCCWCC..","..CCWCCCCCCWCC..",
+"CCCCCCCCCCCCCCCC","CCCCCCCCCCCCCCCC","CCCCCCCCCCCCCCCC",
+"..CCCCCCCCCCCC..","..CCCCCCCCCCCC..",
+"...C.C....C.C...","...C.C....C.C...","...C.C....C.C..."];
+/* ---------- skill catalog (실제 스킬 = 장비) ---------- */
+const CATALOG=[
+ {id:"autopilot",   nm:"Autopilot",     kd:"무기",   ic:"sword", at:14, cl:"#60a5fa"},
+ {id:"ultrawork",   nm:"Ultrawork",     kd:"무기",   ic:"sword", at:16, cl:"#f472b6"},
+ {id:"ralph",       nm:"Ralph Loop",    kd:"스킬",   ic:"staff", at:10, cl:"#a78bfa"},
+ {id:"ralplan",     nm:"Ralplan",       kd:"스킬",   ic:"staff", at:9,  cl:"#fbbf24"},
+ {id:"team",        nm:"Team",          kd:"소환",   ic:"staff", at:8,  cl:"#34d399"},
+ {id:"deep-research",nm:"Deep Research",kd:"스킬",   ic:"staff", at:11, cl:"#c084fc"},
+ {id:"review",      nm:"Code Review",   kd:"방어구", ic:"shield",at:6,  cl:"#22d3ee"},
+ {id:"verify",      nm:"Verify",        kd:"방어구", ic:"armor", at:7,  cl:"#4ade80"},
+];
+const byId=Object.fromEntries(CATALOG.map(s=>[s.id,s]));
+
+/* ---------- offscreen pixel buffer ---------- */
+const VW=360,VH=200;
+const OS=document.createElement("canvas");OS.width=VW;OS.height=VH;
+const o=OS.getContext("2d");o.imageSmoothingEnabled=false;
+const cv=document.getElementById("scene");
+const ctx=cv.getContext("2d");
+let scene={scale:1,ox:0,oy:0};
+
+function drawDots(g,ox,oy,cell,pal){
+  for(let y=0;y<g.length;y++){const r=g[y];
+    for(let x=0;x<r.length;x++){const ch=r[x];if(ch===" "||ch===".")continue;
+      const col=pal[ch];if(!col)continue;
+      o.fillStyle=col;o.fillRect(ox+x*cell,oy+y*cell,cell,cell);}}
+}
+/* Claude-shaped enemy: 도트 인베이더 (CLAUDE_G 그리드) */
+function drawClaude(cx,cy,cell,hit,dead){
+  const g=CLAUDE_G, W=g[0].length, H=g.length;
+  const wob=dead?0:Math.round(Math.sin(t/16)*1.5);
+  const ox=cx-W*cell/2, oy=cy-H*cell/2+wob;
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    const ch=g[y][x]; if(ch===".")continue;
+    const col= ch==="W" ? COL.W : ((hit>0&&t%2===0)?"#ffd9c9":COL.C);
+    let px=ox+x*cell, py=oy+y*cell;
+    o.globalAlpha=1;
+    if(dead){ py+=dead*dead*0.16; px+=(x<W/2?-1:1)*dead*0.5; o.globalAlpha=Math.max(0,1-dead/26); }
+    o.fillStyle=col; o.fillRect(px,py,cell,cell);
+  }
+  o.globalAlpha=1;
+}
+const CLAUDE_HALF=CLAUDE_G.length*2.5; // halfHeight at cell=5
+function drawHero(h){
+  const cell=4, bob=Math.round(Math.sin((t+h.bob)/10)*1.5);
+  let hx=h.x, hy=h.y+bob, lunge=0;
+  if(h.atkT>0 && h.melee){ const k=h.atkT; lunge=Math.round(Math.sin((12-k)/12*Math.PI)*14); }
+  hx+=lunge;
+  const cx=hx+16, cy=hy+24;
+  // 장착 아우라
+  if(h.eq.length){ o.globalAlpha=0.15+0.10*Math.sin(t/6);
+    o.fillStyle=h.eq[h.eq.length-1].cl;o.fillRect(hx-2,hy-2,8*cell+4,12*cell+4);o.globalAlpha=1;}
+  // 방어구(armor) 장착 시 몸통·헬멧 색 교체
+  const armor=lastBy(h,["armor"]);
+  const pal=armor?Object.assign({},h.pal,{B:armor.cl,b:shade(armor.cl,0.6),M:armor.cl,m:shade(armor.cl,0.55)}):h.pal;
+  drawDots(SPR[h.cls],hx,hy,cell,pal);
+  // 무기: 장착 무기(검/지팡이/활) 우선, 없으면 직업 기본 — 종류별로 위치가 달라짐
+  const wp=lastBy(h,["sword","staff","bow"]);
+  const wtype=wp?wp.ic:CLASSES[h.cls].weapon, wcol=wp?wp.cl:h.wcol, wo=WPOS[wtype]||[28,8];
+  const wpal={X:wcol,W:COL.W,B:COL.B,Y:pal.B,S:"#cbd5e1","=":COL.B,A:COL.W};
+  drawDots(ICONS[wtype], hx+wo[0], hy+wo[1], 3, wpal);
+  // 방패(shield) 장착 시 왼팔에
+  const shield=lastBy(h,["shield"]);
+  if(shield) drawDots(ICONS.shield, hx-10, hy+18, 2, {X:shield.cl,W:COL.W});
+  // 장착 스킬 = 궤도 보석 (여러 개가 겹치지 않게 회전 배치 → 장착 수만큼 보임)
+  const N=h.eq.length;
+  h.eq.forEach((s,i)=>{
+    const ang=t/45 + i*(Math.PI*2/N);
+    const ex=Math.round(cx+Math.cos(ang)*22), ey=Math.round(cy-12+Math.sin(ang)*12);
+    o.fillStyle="#0b1020"; o.fillRect(ex-3,ey-3,6,6);
+    o.fillStyle=s.cl; o.fillRect(ex-2,ey-2,4,4);
+    o.fillStyle=COL.W; o.fillRect(ex-2,ey-2,1,1);
+  });
+  // 이름표
+  o.fillStyle="#0b1020cc";o.fillRect(hx-4,hy+12*cell+2,8*cell+8,9);
+  o.fillStyle=COL.W;o.font="7px monospace";o.textAlign="center";
+  o.fillText(h.name,hx+16,hy+12*cell+9);
+}
+/* ---------- floating texts ---------- */
+let pops=[];
+function pop(x,y,txt,col,big,life){pops.push({x,y,txt,col,life:life||(big?44:30),vy:-0.7,big});}
+function drawPops(){
+  for(const p of pops){p.y+=p.vy;p.life--;
+    o.globalAlpha=Math.min(1,p.life/12);
+    o.fillStyle=p.col;o.font=(p.big?"bold 12px":"9px")+" monospace";o.textAlign="center";
+    o.fillText(p.txt,p.x,p.y);o.globalAlpha=1;}
+  pops=pops.filter(p=>p.life>0);
+}
+/* ---------- game state ---------- */
+let heroes=[], proj=[], enemy={hp:0,hpMax:100,alive:false,hit:0,dead:0,x:284,y:86,cell:5};
+let phase="idle", label="대기 중...";
+let mode="demo", t=0, banner=0, bannerTxt="";
+function makeHero(i,cls){
+  cls=cls||CLASS_KEYS[i%3];
+  const c=CLASSES[cls], body=rnd(c.body), hat=rnd(c.hat), skin=rnd(SKINS);
+  return {slot:i, cls, melee:c.melee, x:0, y:96, bob:i*9, atkT:0, eq:[], pending:null,
+    name:["MAIN","EXEC","TEAM","SCOUT"][i]||("A"+(i+1)),
+    pal:{M:hat[0],m:hat[1],K:skin,E:COL.E,B:body[0],b:body[1],S:c.trim,L:COL.L,O:COL.O},
+    wcol: cls==="knight"?"#e3e9f0":hat[0]};
+}
+function layout(){ // 근접=앞(적에 가까이), 원거리=뒤(왼쪽) — 궤도 보석이 겹치지 않게 간격 확대
+  let mi=0, ri=0;
+  heroes.forEach(h=>{ if(h.melee){h.x=166+mi*54;h.y=106;mi++;} else {h.x=14+ri*56;h.y=78;ri++;} });
+}
+function setHeroes(n){
+  n=Math.max(1,Math.min(4,n));
+  while(heroes.length<n)heroes.push(makeHero(heroes.length));
+  if(heroes.length>n)heroes.length=n;
+  layout();
+}
+function spawnEnemy(hp){enemy.hpMax=hp||100;enemy.hp=enemy.hpMax;enemy.alive=true;enemy.dead=0;enemy.hit=0;proj=[];}
+function attack(h,skill){
+  if(!enemy.alive||h.atkT>0)return;
+  h.atkT=12;
+  const s=skill||{nm:"공격",at:6,cl:"#fff"};
+  if(h.melee) h.pending=s;
+  else proj.push({x:h.x+30,y:h.y+24,s,col:s.cl||"#fff",mage:h.cls==="mage",life:0});
+}
+function applyHit(s){
+  if(!enemy.alive)return;
+  enemy.hp=Math.max(0,enemy.hp-s.at);enemy.hit=6;
+  pop(enemy.x+(Math.random()*30-15),enemy.y-12,"-"+s.at,"#ffd166");
+  pop(enemy.x,enemy.y-30,s.nm,s.cl||"#fff");
+  if(enemy.hp<=0&&enemy.dead===0)victory();
+}
+function updateProj(){
+  for(const p of proj){
+    const dx=enemy.x-p.x, dy=enemy.y-p.y, d=Math.hypot(dx,dy)||1;
+    p.x+=dx/d*9; p.y+=dy/d*9; p.life++;
+    if(d<9){ p.hit=true; if(p.s)applyHit(p.s); else {enemy.hit=4;spark();} }
+  }
+  proj=proj.filter(p=>!p.hit && p.life<70);
+}
+function spark(){ // 작은 타격 불꽃 (HP 변화 없음)
+  pop(enemy.x+(Math.random()*36-18), enemy.y+(Math.random()*24-12),
+      ["✦","✧","＊"][Math.floor(Math.random()*3)], "#ffe7c2", false, 11);
+}
+function ambientAttack(){ // 작업 중 끊임없이 싸우는 연출 (실제 HP는 안 깎음)
+  const idle=heroes.filter(h=>h.atkT===0); if(!idle.length)return;
+  const h=idle[Math.floor(Math.random()*idle.length)]; h.atkT=12;
+  if(h.melee) h.pending={cosmetic:true};
+  else proj.push({x:h.x+30,y:h.y+24,s:null,col:h.eq.length?h.eq[h.eq.length-1].cl:"#cbd5e1",mage:h.cls==="mage",life:0});
+}
+function drawProj(){
+  for(const p of proj){
+    if(p.mage){ o.fillStyle=p.col;o.fillRect(p.x-3,p.y-3,6,6);o.fillStyle=COL.W;o.fillRect(p.x-1,p.y-1,2,2); }
+    else { o.fillStyle=COL.B;o.fillRect(p.x-5,p.y-1,9,2);o.fillStyle=p.col;o.fillRect(p.x+3,p.y-2,3,4); }
+  }
+}
+function victory(){enemy.dead=1;banner=120;bannerTxt="CLEAR!";
+  pop(enemy.x,enemy.y-44,"★ 결함 처치 ★","#46e0a0",true);}
+
+/* ---------- update & render ---------- */
+function update(){
+  t++;
+  for(const h of heroes){ if(h.atkT>0){h.atkT--; if(h.atkT===6&&h.melee&&h.pending){ if(h.pending.cosmetic){enemy.hit=4;spark();} else applyHit(h.pending); h.pending=null;}} }
+  updateProj();
+  if(enemy.hit>0)enemy.hit--;
+  if(enemy.dead>0){enemy.dead++; if(enemy.dead>26){enemy.alive=false;enemy.dead=0;proj=[];}}
+  if(banner>0)banner--;
+  if(mode==="demo")demo();
+  else if(enemy.alive&&!enemy.dead&&(phase==="thinking"||phase==="tool"||phase==="baking")&&t%18===0)ambientAttack();
+}
+let dseq=[
+ {p:"idle",l:"대기 중...",d:40},
+ {p:"thinking",l:"사고 중 (Thinking)",d:90,on:()=>{setHeroes(3);spawnEnemy(120);}},
+ {p:"tool",l:"도구 실행 (Tool Use)",d:150,atk:true},
+ {p:"baking",l:"빌드 중 (Baking)",d:120,atk:true},
+ {p:"done",l:"결함 처치 완료!",d:120,on:()=>{finish();}},
+];
+let di=0,dt=0,dEntered=false;
+function demo(){
+  const step=dseq[di];
+  if(!dEntered){phase=step.p;label=step.l;if(step.on)step.on();dEntered=true;}
+  if(step.atk && enemy.alive && t%26===0){
+    const h=heroes[Math.floor(Math.random()*heroes.length)];
+    const sk=h.eq.length?h.eq[Math.floor(Math.random()*h.eq.length)]:null;
+    attack(h,sk);
+  }
+  dt++;
+  if(dt>=step.d){dt=0;di=(di+1)%dseq.length;dEntered=false;}
+}
+function finish(){ // 모든 용사 일제히 마무리 일격
+  heroes.forEach((h,i)=>setTimeout(()=>{
+    const sk=h.eq.length?h.eq[h.eq.length-1]:{nm:"FINISH",at:40,cl:"#fff"};
+    attack(h,{nm:sk.nm,at:Math.max(40,sk.at),cl:sk.cl||"#fff"});
+  },i*160));
+}
+function render(){
+  o.clearRect(0,0,VW,VH);
+  // ground line
+  o.fillStyle="#0a101e";o.fillRect(0,150,VW,50);
+  o.fillStyle="#14203a";for(let x=0;x<VW;x+=8)o.fillRect(x,150,4,2);
+  // phase banner (top)
+  o.fillStyle="#0b1020";o.fillRect(0,0,VW,14);
+  o.fillStyle=phase==="done"?"#46e0a0":"#7c9cff";
+  o.font="8px monospace";o.textAlign="left";
+  o.fillText("◈ "+label,6,10);
+  // enemy + hp
+  if(enemy.alive){
+    drawClaude(enemy.x,enemy.y,enemy.cell,enemy.hit,enemy.dead);
+    if(!enemy.dead){
+      const bw=84,bx=enemy.x-bw/2,by=enemy.y-CLAUDE_HALF-14;
+      o.fillStyle="#0008";o.fillRect(bx-1,by-1,bw+2,7);
+      o.fillStyle="#3a1212";o.fillRect(bx,by,bw,5);
+      o.fillStyle="#ff5d5d";o.fillRect(bx,by,bw*(enemy.hp/enemy.hpMax),5);
+      o.fillStyle=COL.W;o.font="7px monospace";o.textAlign="center";
+      o.fillText("CLAUDE  "+enemy.hp+"/"+enemy.hpMax,enemy.x,by-3);
+    }
+  } else if(phase!=="idle"){
+    o.fillStyle="#46e0a0";o.font="9px monospace";o.textAlign="center";
+    o.fillText("✔ 해결됨",enemy.x,enemy.y);
+  }
+  heroes.forEach(drawHero);
+  drawProj();
+  drawPops();
+  if(banner>0){
+    o.globalAlpha=Math.min(1,banner/20);
+    o.fillStyle="#46e0a0";o.font="bold 20px monospace";o.textAlign="center";
+    o.fillText(bannerTxt,VW/2,40);o.globalAlpha=1;
+  }
+  blit();
+}
+function blit(){
+  const dpr=window.devicePixelRatio||1;
+  const cw=cv.clientWidth,ch=cv.clientHeight;
+  if(cv.width!==cw*dpr||cv.height!==ch*dpr){cv.width=cw*dpr;cv.height=ch*dpr;}
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.imageSmoothingEnabled=false;
+  ctx.fillStyle="#0b1426";ctx.fillRect(0,0,cw,ch);
+  const sc=Math.max(1,Math.min(cw/VW,ch/VH));
+  const ox=(cw-VW*sc)/2, oy=(ch-VH*sc)/2;
+  scene={scale:sc,ox,oy};
+  ctx.drawImage(OS,0,0,VW,VH,ox,oy,VW*sc,VH*sc);
+}
+function loop(){update();render();requestAnimationFrame(loop);}
+
+/* ---------- inventory UI + drag & drop ---------- */
+function iconCanvas(s){
+  const c=document.createElement("canvas");c.width=24;c.height=24;
+  const g=c.getContext("2d");g.imageSmoothingEnabled=false;
+  const pal={X:s.cl,W:COL.W,B:COL.B,Y:COL.Y};
+  const grid=ICONS[s.ic];const cell=3, oy=1;
+  grid.forEach((row,y)=>{[...row].forEach((ch,x)=>{const col=pal[ch];if(!col||ch===" ")return;
+    g.fillStyle=col;g.fillRect(x*cell+1,y*cell+oy,cell,cell);});});
+  return c;
+}
+function buildInventory(){
+  const wrap=document.getElementById("items");wrap.innerHTML="";
+  CATALOG.forEach(s=>{
+    const d=document.createElement("div");d.className="card";d.draggable=true;d.dataset.id=s.id;
+    d.appendChild(iconCanvas(s));
+    d.insertAdjacentHTML("beforeend",
+      `<div class="nm">${s.nm}</div><div class="kd">${s.kd}</div><div class="at">ATK ${s.at}</div>`);
+    d.addEventListener("dragstart",e=>e.dataTransfer.setData("text/plain",s.id));
+    d.addEventListener("click",()=>equip(heroes[0],s.id)); // 클릭=1번 용사 장착
+    wrap.appendChild(d);
+  });
+}
+function equip(h,id){
+  if(!h)return;const s=byId[id];if(!s)return;
+  if(h.eq.some(e=>e.id===id))return;
+  h.eq.push(s);pop(h.x+16,h.y-6,"장착! "+s.nm,s.cl);renderLoadout();
+}
+function unequip(h,id){h.eq=h.eq.filter(e=>e.id!==id);renderLoadout();}
+function renderLoadout(){
+  const row=document.getElementById("loadoutRow");row.innerHTML="";
+  heroes.forEach(h=>{
+    const el=document.createElement("div");el.className="hslot";
+    const chips=h.eq.map(s=>`<span class="chip" data-h="${h.slot}" data-id="${s.id}">${s.nm} <i>×</i></span>`).join("");
+    el.innerHTML=`🛡 <b>${h.name}</b> <span class="hint">${CLSKO[h.cls]}</span>${chips?`<span class="chips">${chips}</span>`:` <span class="hint">— 비어있음</span>`}`;
+    row.appendChild(el);
+  });
+  row.querySelectorAll(".chip").forEach(c=>c.addEventListener("click",()=>
+    unequip(heroes[+c.dataset.h],c.dataset.id)));
+}
+/* drop on scene -> nearest hero */
+cv.addEventListener("dragover",e=>{e.preventDefault();cv.classList.add("drop");});
+cv.addEventListener("dragleave",()=>cv.classList.remove("drop"));
+cv.addEventListener("drop",e=>{
+  e.preventDefault();cv.classList.remove("drop");
+  const id=e.dataTransfer.getData("text/plain");if(!id)return;
+  const r=cv.getBoundingClientRect();
+  const vx=(e.clientX-r.left-scene.ox)/scene.scale;
+  let best=heroes[0],bd=1e9;
+  heroes.forEach(h=>{const d=Math.abs(h.x+16-vx);if(d<bd){bd=d;best=h;}});
+  equip(best,id);
+});
+
+/* ---------- LIVE link (Hook + 상태파일 연동) ---------- */
+let liveTimer=null, fileHandle=null;
+const STATE_FILE="skill-hero-state.json";
+function setMode(m){
+  mode=m;
+  document.getElementById("statusDot").className="dot "+(m==="live"?"live":"demo");
+  document.getElementById("statusTxt").textContent=m==="live"?"LIVE":"DEMO";
+  document.getElementById("btnDemo").classList.toggle("on",m==="demo");
+  document.getElementById("btnLive").classList.toggle("on",m==="live");
+  if(m==="demo"){di=0;dt=0;dEntered=false;if(liveTimer)clearInterval(liveTimer);liveTimer=null;}
+}
+function syncAgents(list){ // 에이전트 이름 → 직업 매핑 + 장비 보존
+  const names=list.map((a,i)=>(a&&a.name)?String(a.name):("A"+(i+1)));
+  const n=Math.max(1,Math.min(4,names.length)), old=heroes; heroes=[];
+  for(let i=0;i<n;i++){
+    const cls=classForAgent(names[i],i), prev=old[i];
+    const h=(prev&&prev.cls===cls)?prev:makeHero(i,cls);
+    if(prev&&h!==prev)h.eq=prev.eq;
+    h.name=names[i].toUpperCase().slice(0,6); h.slot=i; heroes.push(h);
+  }
+  layout();
+}
+function applyState(st){
+  if(!st||typeof st!=="object")return;
+  if(Array.isArray(st.agents)) syncAgents(st.agents);
+  else if(typeof st.agents==="number") setHeroes(st.agents); // agents 없으면 현 인원 유지
+  if(Array.isArray(st.skills)) heroes.forEach(h=>st.skills.forEach(id=>{if(byId[id]&&!h.eq.some(e=>e.id===id))h.eq.push(byId[id]);}));
+  renderLoadout();
+  phase=st.phase||"thinking";
+  label=st.label||({thinking:"사고 중 (Thinking)",tool:"도구 실행 (Tool Use)",
+    baking:"빌드 중 (Baking)",done:"결함 처치 완료!",idle:"대기 중..."}[phase]||phase);
+  const hp=typeof st.hp==="number"?Math.max(0,Math.min(100,st.hp)):null;
+  if(phase==="idle"){enemy.alive=false;return;}
+  if(!enemy.alive&&phase!=="done"){spawnEnemy(100);}
+  if(hp!==null&&enemy.alive){
+    if(hp<enemy.hp){ // 데미지 들어옴 -> 공격 연출 (근접=돌진 / 원거리=투사체)
+      const h=heroes[Math.floor(Math.random()*heroes.length)];
+      const sk=h.eq.length?h.eq[h.eq.length-1]:null;
+      const dmg=enemy.hp-hp;enemy.hp=hp;enemy.hit=6;if(h.atkT===0)h.atkT=12;
+      if(!h.melee)proj.push({x:h.x+30,y:h.y+24,s:null,col:sk?sk.cl:"#fff",mage:h.cls==="mage",life:0});
+      pop(enemy.x,enemy.y-12,"-"+dmg,"#ffd166");if(sk)pop(enemy.x,enemy.y-30,sk.nm,sk.cl);
+    } else enemy.hp=hp;
+  }
+  if(phase==="done"){ if(enemy.alive&&enemy.dead===0){enemy.hp=0;finish();} }
+}
+async function pollFetch(){
+  try{const r=await fetch(STATE_FILE+"?t="+Date.now(),{cache:"no-store"});
+    if(r.ok){applyState(await r.json());return true;}}catch(e){}
+  return false;
+}
+async function pollHandle(){
+  try{const f=await fileHandle.getFile();applyState(JSON.parse(await f.text()));}catch(e){}
+}
+async function goLive(){
+  // 1) 서버 제공 시 fetch 폴링
+  if(await pollFetch()){setMode("live");if(liveTimer)clearInterval(liveTimer);
+    liveTimer=setInterval(pollFetch,1000);return;}
+  // 2) file:// 환경 -> 파일 선택(File System Access API) 폴링
+  if(window.showOpenFilePicker){
+    try{[fileHandle]=await window.showOpenFilePicker({types:[{description:"state",accept:{"application/json":[".json"]}}]});
+      setMode("live");await pollHandle();
+      if(liveTimer)clearInterval(liveTimer);liveTimer=setInterval(pollHandle,1000);return;
+    }catch(e){alert("연결 취소됨 — 데모 모드를 유지합니다.");return;}
+  }
+  alert("LIVE 연결 안내\n\n로컬 서버로 열면 자동 감지됩니다:\n  python -m http.server 8000\n  → http://localhost:8000/skill-hero.html\n\n그 폴더에 "+STATE_FILE+" 가 있으면 자동 연동됩니다.\n(훅 설치: README 참고)");
+}
+// 드롭으로 상태 파일 1회 적용도 허용
+document.body.addEventListener("dragover",e=>{if([...e.dataTransfer.types].includes("Files"))e.preventDefault();});
+document.body.addEventListener("drop",e=>{
+  const f=e.dataTransfer.files[0];if(!f||!f.name.endsWith(".json"))return;
+  e.preventDefault();const rd=new FileReader();
+  rd.onload=()=>{try{applyState(JSON.parse(rd.result));setMode("live");}catch(_){}}; rd.readAsText(f);
+});
+
+document.getElementById("btnLive").addEventListener("click",goLive);
+document.getElementById("btnDemo").addEventListener("click",()=>setMode("demo"));
+
+/* ---------- boot ---------- */
+buildInventory();
+setHeroes(2);
+heroes[0].eq.push(byId.autopilot);
+heroes[1].eq.push(byId.ultrawork);
+renderLoadout();
+setMode("demo");
+loop();
+</script>
+</body>
+</html>
