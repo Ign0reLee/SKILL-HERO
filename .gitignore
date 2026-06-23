@@ -1,0 +1,10 @@
+# 런타임 상태 파일 (훅이 ~/.claude/ 에 생성 — 저장소엔 불필요)
+skill-hero-state.json
+
+# 로컬 개발용 (미리보기 서버 설정 등)
+.claude/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo

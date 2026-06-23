@@ -80,8 +80,8 @@ The shared state path is **`~/.claude/skill-hero-state.json`** (override with th
 
 **Option A — Install as a plugin (recommended, automatic):** this folder is a Claude Code **plugin**; enabling it **auto-applies** the hooks (no settings.json editing).
 ```
-# after pushing to a git repo (for others to install)
-/plugin marketplace add <github-user>/<repo>
+# for others to install
+/plugin marketplace add Ign0reLee/SKILL-HERO
 /plugin install skill-hero@skill-hero-marketplace
 # (mid-session: /reload-plugins)
 ```
@@ -215,7 +215,7 @@ skill-hero-overlay.pyw  더블클릭   (또는)   pythonw skill-hero-overlay.pyw
 
 **방법 ㉮ 플러그인 설치 (권장 · 자동):** 이 폴더가 Claude Code **플러그인**입니다. 설치/활성화하면 훅이 **자동 적용**되어 settings.json을 만질 필요가 없습니다.
 ```
-/plugin marketplace add <github-사용자>/<저장소이름>
+/plugin marketplace add Ign0reLee/SKILL-HERO
 /plugin install skill-hero@skill-hero-marketplace
 # (세션 중이면 즉시 반영: /reload-plugins)
 ```

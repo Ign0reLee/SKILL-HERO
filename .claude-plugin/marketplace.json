@@ -1,0 +1,11 @@
+{
+  "name": "skill-hero-marketplace",
+  "owner": { "name": "dlwpdud" },
+  "plugins": [
+    {
+      "name": "skill-hero",
+      "source": "./",
+      "description": "Claude 작업을 도트 RPG 전투로 시각화하는 비주얼라이저. 훅 자동 적용 + 데스크톱 오버레이."
+    }
+  ]
+}

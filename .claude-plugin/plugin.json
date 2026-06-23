@@ -1,0 +1,7 @@
+{
+  "name": "skill-hero",
+  "description": "Claude의 작업을 도트 RPG 전투로 시각화 — 직업별 도트 용사가 스킬(무기·방어구)을 장착하고 '클로드 인베이더'를 처치한다. 설치 시 훅이 자동 적용되어 실시간 연동.",
+  "version": "1.0.0",
+  "author": { "name": "dlwpdud" },
+  "keywords": ["visualizer", "pixel-art", "hooks", "overlay", "rpg"]
+}
