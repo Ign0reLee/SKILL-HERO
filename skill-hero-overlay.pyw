@@ -63,11 +63,12 @@ dragging = None               # 드래그 중인 스킬 id
 curx = cury = 0               # 커서 위치
 moving = False; mox = moy = 0 # 전장 창 이동 상태
 mmoving = False; mmx = mmy = 0 # 메뉴 창 이동 상태
+SPAWN = 22                     # 소환 모션 프레임 수
 
 def makeHero(i, cls=None):
     cls = cls or CKEYS[i % 3]; c = CLASSES[cls]
     body = random.choice(c["body"]); hat = random.choice(c["hat"]); skin = random.choice(SKINS)
-    return {"slot":i,"cls":cls,"melee":c["melee"],"x":0,"y":96,"bob":i*9,"atkT":0,"eq":[],"pending":None,
+    return {"slot":i,"cls":cls,"melee":c["melee"],"x":0,"y":96,"bob":i*9,"atkT":0,"eq":[],"pending":None,"spawnT":SPAWN,
         "name":(["MAIN","EXEC","TEAM","SCOUT"][i] if i < 4 else "A%d"%(i+1)),
         "pal":{"M":hat[0],"m":hat[1],"K":skin,"E":COL["E"],"B":body[0],"b":body[1],"S":c["trim"],"L":COL["L"],"O":COL["O"]},
         "wcol":("#e3e9f0" if cls=="knight" else hat[0])}
@@ -100,7 +101,7 @@ def equip(h, sid):
 
 # ---------- combat ----------
 def attack(h, sid):
-    if not enemy["alive"] or h["atkT"] > 0: return
+    if not enemy["alive"] or h["atkT"] > 0 or h.get("spawnT", 0) > 0: return  # 소환 중엔 공격 안 함
     h["atkT"] = 12
     s = {"nm":CAT[sid][2],"at":CAT[sid][3],"col":CAT[sid][1]} if sid else {"nm":"공격","at":6,"col":"#fff"}
     if h["melee"]: h["pending"] = s
@@ -135,7 +136,7 @@ def spark():  # 작은 타격 불꽃 (HP 변화 없음)
     pops.append({"x":enemy["x"]+random.randint(-18,18),"y":enemy["y"]+random.randint(-12,12),
                  "txt":random.choice(["✦","✧","＊"]),"col":"#ffe7c2","life":11,"vy":-0.3,"big":False})
 def ambientAttack():  # 작업 중 끊임없이 싸우는 연출 (실제 HP는 안 깎음)
-    idle = [h for h in heroes if h["atkT"] == 0]
+    idle = [h for h in heroes if h["atkT"] == 0 and h.get("spawnT", 0) == 0]
     if not idle: return
     h = random.choice(idle); h["atkT"] = 12
     if h["melee"]: h["pending"] = {"cosmetic": True}
@@ -165,6 +166,7 @@ def update():
     global t, banner
     t += 1
     for h in heroes:
+        if h.get("spawnT", 0) > 0: h["spawnT"] -= 1   # 소환 모션 진행
         if h["atkT"] > 0:
             h["atkT"] -= 1
             if h["atkT"] == 6 and h["melee"] and h["pending"]:
@@ -236,8 +238,10 @@ def apply_state(st):
         enemy["hp"] = 0; finish()
 
 # ---------- rendering ----------
-def dots(cv, grid, ox, oy, cell, pal):
+def dots(cv, grid, ox, oy, cell, pal, reveal=1.0):
+    start = int(len(grid)*(1-reveal))   # reveal<1 이면 아래쪽 행부터 나타남(소환 머티리얼라이즈)
     for y, row in enumerate(grid):
+        if y < start: continue
         for x, ch in enumerate(row):
             if ch == " " or ch == ".": continue
             col = pal.get(ch)
@@ -258,8 +262,25 @@ def draw_claude(cv):
             if enemy["dead"]:
                 d = enemy["dead"]; Y += int(d*d*0.16); X += (-1 if x < Wc/2 else 1)*int(d*0.5)
             cv.create_rectangle(X, Y, X+EC, Y+EC, fill=col, width=0)
+def draw_summon(cv, h, HC):   # 소환 모션: 마법진 펄스 + 상승 스파클 + 아래→위 머티리얼라이즈
+    hx = h["x"]; hy = h["y"]; cx = hx + 20; baseY = hy + 12*HC; sp = h["spawnT"]
+    p = 1 - sp/SPAWN
+    rad = int(5 + 17*math.sin(min(1.0, p*1.4)*math.pi))                  # 펄스(확장→수축)
+    col = "#a78bfa" if (sp//2) % 2 == 0 else "#7c9cff"
+    for k in range(12):
+        a = k/12*2*math.pi
+        X = cx + int(math.cos(a)*rad); Y = baseY + 4 + int(math.sin(a)*rad*0.38)
+        cv.create_rectangle(X-1, Y-1, X+2, Y+2, fill=col, width=0)
+    for k in range(3):                                                  # 상승 스파클
+        sy = baseY - int((p*46 + k*14) % 50); sx = cx + (k-1)*8
+        cv.create_rectangle(sx-1, sy-1, sx+1, sy+1, fill="#e9e3ff", width=0)
+    dots(cv, SPR[h["cls"]], hx, hy, HC, dict(h["pal"]), reveal=max(0.12, p))
+    cv.create_rectangle(hx-4, hy+12*HC+2, hx+44, hy+12*HC+13, fill="#0b1020", width=0)
+    cv.create_text(hx+20, hy+12*HC+8, text=h["name"], fill="#cbb8ff", font=("Consolas", 8))
 def draw_hero(cv, h):
-    HC = 5; bob = round(math.sin((t + h["bob"])/10)*1.5)
+    HC = 5
+    if h.get("spawnT", 0) > 0: draw_summon(cv, h, HC); return
+    bob = round(math.sin((t + h["bob"])/10)*1.5)
     hx = h["x"]; hy = h["y"] + bob
     if h["atkT"] > 0 and h["melee"]:
         hx += round(math.sin((12 - h["atkT"])/12*math.pi)*16)
