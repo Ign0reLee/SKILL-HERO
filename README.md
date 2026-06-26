@@ -14,16 +14,17 @@ and your **pixel heroes — equipped with your skills (weapons & armor) — defe
 - 🎮 **Claude's work = a live battle** — linked to Claude via hooks. Every tool use chips the enemy's HP, and on `Stop` the heroes land a finishing blow → **CLEAR**
 - ⚔ **Equip skills as gear** — real skills like `autopilot · ultrawork · ralph · verify …` are drawn as swords/staves/armor/shields. **Drag** them onto a hero to equip (multiple skills orbit the hero as gems)
 - 🧙 **Multi-agent = multiple heroes** — spawning subagents (Task) adds class-based heroes (**knight · archer · mage**) that fight together
-- 🖥 **Three forms** — ① standalone HTML ② a Claude Desktop **overlay that fights on top of the chat** (`/skill-hero`) ③ a Claude Code **plugin** (hooks auto-apply on install)
+- 🖥 **Runs anywhere** — `/skill-hero` opens the visualizer in your **local browser**; works over **SSH/remote** via VS Code port-forwarding. Optional native desktop overlay for local use. Installs as a Claude Code **plugin** (hooks auto-apply)
 - 📦 **Zero dependencies** — browser / Python standard library only; runs as-is, no install
 
 ```
-skill-hero.html          ← ① Standalone HTML visualizer (browser / Claude Desktop embed source)
-skill-hero-overlay.pyw   ← ② Claude Desktop "on-top-of-chat" overlay (always-on-top · transparent · click-through)
+skill-hero.html          ← Visualizer UI (served to your browser, or embedded as a widget)
+skill-hero-serve.py      ← Local server: serves the UI + live state (works over SSH via port-forward)
+skill-hero-overlay.pyw   ← Optional native desktop overlay (local only · always-on-top · transparent)
 skill-hero-hook.py       ← Claude Code events → state-file bridge hook
 .claude-plugin/          ← plugin / marketplace manifests (plugin.json, marketplace.json)
 hooks/hooks.json         ← hooks that auto-apply when the plugin is installed
-commands/skill-hero.md   ← the /skill-hero slash command (launches the overlay)
+commands/skill-hero.md   ← the /skill-hero command (opens the browser visualizer)
 ```
 
 > This folder **is a Claude Code plugin** — installing it auto-applies the hooks (see "Live link" below).
@@ -85,11 +86,19 @@ The shared state path is **`~/.claude/skill-hero-state.json`** (override with th
 /plugin install skill-hero@skill-hero-marketplace
 # (mid-session: /reload-plugins)
 ```
-Installing gives you two things automatically: **(1) hooks auto-applied**, and **(2) the `/skill-hero` command** that launches the overlay in the background.
+Installing gives you two things automatically: **(1) hooks auto-applied**, and **(2) the `/skill-hero` command** that starts the local server and opens the visualizer in your browser.
 ```
-/skill-hero        # opens the overlay → SPACE in the battle window for LIVE, ESC to quit
+/skill-hero        # local: opens your browser. SSH/remote: open http://localhost:8777 locally (VS Code forwards it)
 ```
 Plugin layout: `.claude-plugin/{plugin.json, marketplace.json}`, `hooks/hooks.json`, `commands/skill-hero.md`. Hooks & command use `${CLAUDE_PLUGIN_ROOT}` so they work regardless of install location.
+
+#### Remote / SSH (VS Code Remote-SSH)
+When Claude Code runs on a remote box, the **UI must run on your local machine**. The browser path handles this:
+1. `/skill-hero` starts `skill-hero-serve.py` on the remote (port 8777) and the hook writes state there.
+2. VS Code **auto-forwards port 8777** (if not, add it in the **Ports** panel).
+3. Open **`http://localhost:8777` in your local browser** → it auto-connects LIVE and mirrors the remote work.
+
+The native tkinter overlay can't display from remote to local — use the browser path above. (To run the native overlay locally against remote state: launch `skill-hero-overlay.pyw` on your PC with `SKILL_HERO_STATE_URL=http://localhost:8777/skill-hero-state.json`.)
 
 **Option B — Manual settings.json** (on your own machine): add to `hooks` in `~/.claude/settings.json` (absolute path for your env), for events `UserPromptSubmit`, `PreToolUse` (matcher `*`), `PostToolUse` (matcher `*`), `Stop`, each running `python3 "<...>/skill-hero-hook.py"`.
 
@@ -150,16 +159,17 @@ echo '{"hook_event_name":"UserPromptSubmit"}' | python skill-hero-hook.py
 - 🎮 **Claude 작업 = 실시간 전투** — 훅으로 Claude 동작과 연동됩니다. 도구를 쓸수록 적 HP가 깎이고, 작업 종료(Stop) 시 일제히 마무리 일격 → **CLEAR**
 - ⚔ **스킬을 장비로 장착** — `autopilot · ultrawork · ralph · verify …` 등 실제 스킬을 검·지팡이·갑옷·방패로 시각화. 용사에게 **드래그**해 장착(여러 개는 주위를 도는 보석으로 표시)
 - 🧙 **멀티 에이전트 = 여러 용사** — 서브에이전트(Task)를 소환하면 직업별(**기사·궁수·법사**) 용사가 늘어나 함께 싸웁니다
-- 🖥 **세 가지 형태** — ① 단일 HTML ② Claude Desktop **채팅 위 오버레이**(`/skill-hero`) ③ Claude Code **플러그인**(설치 시 훅 자동 적용)
+- 🖥 **어디서나 실행** — `/skill-hero` 가 **로컬 브라우저**로 비주얼라이저를 엽니다. **SSH/원격**도 VS Code 포트 포워딩으로 동작. 로컬 전용 네이티브 오버레이도 선택 제공. Claude Code **플러그인**으로 설치(훅 자동 적용)
 - 📦 **의존성 0** — 브라우저 / 파이썬 표준 라이브러리만으로 추가 설치 없이 바로 실행
 
 ```
-skill-hero.html          ← ① 단일 HTML 비주얼라이저 (브라우저 / Claude Desktop 임베드 소스)
-skill-hero-overlay.pyw   ← ② Claude Desktop '채팅 위' 오버레이 (항상 위 · 투명 · 클릭통과)
+skill-hero.html          ← 비주얼라이저 UI (브라우저로 서빙되거나 위젯으로 임베드)
+skill-hero-serve.py      ← 로컬 서버: UI + 실시간 상태 서빙 (SSH는 포트 포워딩으로 동작)
+skill-hero-overlay.pyw   ← (선택) 네이티브 데스크톱 오버레이 (로컬 전용 · 항상 위 · 투명)
 skill-hero-hook.py       ← Claude Code 이벤트 → 상태파일 연동 훅
 .claude-plugin/          ← 플러그인/마켓플레이스 매니페스트 (plugin.json, marketplace.json)
 hooks/hooks.json         ← 플러그인 설치 시 자동 적용되는 훅 정의
-commands/skill-hero.md   ← /skill-hero 슬래시 커맨드 (오버레이 실행)
+commands/skill-hero.md   ← /skill-hero 커맨드 (브라우저 비주얼라이저 실행)
 ```
 
 > 이 폴더 자체가 **Claude Code 플러그인**입니다 — 설치하면 훅이 자동 적용됩니다(아래 "연동" 참고).
@@ -219,11 +229,19 @@ skill-hero-overlay.pyw  더블클릭   (또는)   pythonw skill-hero-overlay.pyw
 /plugin install skill-hero@skill-hero-marketplace
 # (세션 중이면 즉시 반영: /reload-plugins)
 ```
-설치하면 자동으로 **①훅 적용** + **②`/skill-hero` 커맨드**(오버레이를 백그라운드로 실행)가 생깁니다.
+설치하면 자동으로 **①훅 적용** + **②`/skill-hero` 커맨드**(로컬 서버를 켜고 브라우저로 비주얼라이저를 엶)가 생깁니다.
 ```
-/skill-hero        # ⚔ 오버레이를 띄움 → 전장 창에서 SPACE 로 LIVE, ESC 로 종료
+/skill-hero        # 로컬: 브라우저 자동 오픈 / SSH·원격: 로컬에서 http://localhost:8777 열기(VS Code가 포워딩)
 ```
 플러그인 구조: `.claude-plugin/{plugin.json, marketplace.json}`, `hooks/hooks.json`, `commands/skill-hero.md`. 훅·커맨드 모두 `${CLAUDE_PLUGIN_ROOT}` 를 써서 설치 위치와 무관하게 동작합니다.
+
+#### 원격 / SSH (VS Code Remote-SSH)
+Claude Code가 원격에서 돌 때 **UI는 내 로컬 컴퓨터에서** 떠야 합니다. 브라우저 방식이 이를 해결합니다:
+1. `/skill-hero` 가 원격에서 `skill-hero-serve.py`(포트 8777)를 켜고, 훅이 그곳에 상태를 씁니다.
+2. VS Code가 **포트 8777을 자동 포워딩**합니다(안 되면 **포트** 탭에서 추가).
+3. **내 로컬 브라우저에서 `http://localhost:8777`** 접속 → 자동 LIVE 연결되어 원격 작업이 실시간으로 보입니다.
+
+네이티브 tkinter 오버레이는 원격→로컬로 못 띄우니 위 브라우저 방식을 쓰세요. (굳이 네이티브 오버레이를 로컬에서 쓰려면, 로컬 PC에서 `SKILL_HERO_STATE_URL=http://localhost:8777/skill-hero-state.json` 환경변수와 함께 `skill-hero-overlay.pyw` 를 실행하면 됩니다.)
 
 **방법 ㉯ 수동 settings.json (내 PC):** `~/.claude/settings.json` 의 `hooks` 에 `UserPromptSubmit`, `PreToolUse`(matcher `*`), `PostToolUse`(matcher `*`), `Stop` 각각 `python3 "<...>/skill-hero-hook.py"` 를 추가.
 

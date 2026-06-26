@@ -7,6 +7,8 @@ import sys, os, json, math, random, re
 
 # 상태 파일은 훅과 공유하는 공용 경로(플러그인 설치 위치와 무관). SKILL_HERO_STATE 로 덮어쓰기 가능.
 STATE = os.environ.get("SKILL_HERO_STATE") or os.path.join(os.path.expanduser("~"), ".claude", "skill-hero-state.json")
+# SSH/원격: 로컬에서 오버레이를 띄우고 포워딩된 URL로 상태를 읽을 수 있음 (예: http://localhost:8777/skill-hero-state.json)
+STATE_URL = os.environ.get("SKILL_HERO_STATE_URL")
 TRANSP = "#010101"          # 이 색은 투명 처리(클릭 통과)
 AW, AH = 720, 180           # 전장(이동 가능, 캐릭터만) 창 크기
 
@@ -184,6 +186,10 @@ def update():
 # ---------- live link ----------
 def read_state():
     try:
+        if STATE_URL:                       # 원격: 포워딩된 서버에서 가져오기
+            import urllib.request
+            with urllib.request.urlopen(STATE_URL, timeout=1) as r:
+                return json.loads(r.read().decode("utf-8"))
         with open(STATE, encoding="utf-8") as f: return json.load(f)
     except Exception:
         return None

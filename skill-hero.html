@@ -520,6 +520,8 @@ heroes[1].eq.push(byId.ultrawork);
 renderLoadout();
 setMode("demo");
 loop();
+// 서버(로컬/원격 포워딩)로 열린 경우 상태 파일이 fetch 되므로 자동 LIVE 연결
+pollFetch().then(ok=>{ if(ok){ setMode("live"); if(liveTimer)clearInterval(liveTimer); liveTimer=setInterval(pollFetch,1000); } });
 </script>
 </body>
 </html>
