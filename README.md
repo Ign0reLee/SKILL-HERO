@@ -17,6 +17,17 @@ and your **pixel heroes — equipped with your skills (weapons & armor) — defe
 - 🖥 **Runs anywhere** — `/skill-hero` opens the visualizer in your **local browser**; works over **SSH/remote** via VS Code port-forwarding. Optional native desktop overlay for local use. Installs as a Claude Code **plugin** (hooks auto-apply)
 - 📦 **Zero dependencies** — browser / Python standard library only; runs as-is, no install
 
+### 🎬 In action / 작동 화면 (overlay environment)
+
+**Overlay battle — 오버레이 전투**
+<p><img src="assets/overlay-battle.gif" alt="overlay battle — heroes fight the Claude invader" width="820"></p>
+
+**Drag-to-equip — 스킬 장착** (drag a skill onto a hero; gear changes)
+<p><img src="assets/overlay-equip.gif" alt="drag a skill onto a hero to equip it" width="820"></p>
+
+**Multi-agent — 에이전트가 늘면 동료가 합류** (more agents → more heroes)
+<p><img src="assets/overlay-agents.gif" alt="agents grow into companion heroes" width="820"></p>
+
 ```
 skill-hero.html          ← Visualizer UI (served to your browser, or embedded as a widget)
 skill-hero-serve.py      ← Local server: serves the UI + live state (works over SSH via port-forward)
