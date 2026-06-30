@@ -248,7 +248,7 @@ function drawHero(h){
       o.fillStyle=tc;o.fillRect(hx+2,hy-5,8*cell-4,2);                                  // 왕관 띠
     }
     o.fillStyle="#0b1020cc";o.fillRect(hx+1,hy-21,32,10);
-    o.fillStyle=tc;o.font="bold 8px monospace";o.textAlign="center";
+    o.fillStyle="#ffce54";o.font="bold 8px monospace";o.textAlign="center";  // 레벨 텍스트=폴더 노랑
     o.fillText("Lv."+level,hx+17,hy-13);
   }
 }
@@ -393,7 +393,7 @@ function render(){
   o.fillStyle=phase==="done"?"#46e0a0":"#7c9cff";
   o.font="8px monospace";o.textAlign="left";
   o.fillText("◈ "+label,6,10);
-  o.textAlign="right";o.fillStyle="#ffd166";o.font="bold 8px monospace";
+  o.textAlign="right";o.fillStyle="#ffce54";o.font="bold 8px monospace";  // 레벨 텍스트=폴더 노랑
   o.fillText("Lv."+level+" · 진화까지 "+(10-level%10),VW-6,10);
   // enemy + hp
   if(enemy.alive){

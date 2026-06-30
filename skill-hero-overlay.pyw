@@ -353,7 +353,7 @@ def draw_hero(cv, h):
             for k in range(min(tr, 4)): cv.create_rectangle(hx+5+k*7, hy-9, hx+9+k*7, hy-5, fill=tc, width=0)  # 왕관 보석
             cv.create_rectangle(hx+2, hy-5, hx+8*HC-2, hy-3, fill=tc, width=0)                                  # 왕관 띠
         cv.create_rectangle(hx+1, hy-21, hx+33, hy-11, fill="#0b1020", width=0)
-        cv.create_text(hx+17, hy-16, text="Lv.%d" % level, fill=tc, font=("Consolas", 8, "bold"))
+        cv.create_text(hx+17, hy-16, text="Lv.%d" % level, fill="#ffce54", font=("Consolas", 8, "bold"))  # 레벨=폴더 노랑
 def draw_proj(cv, p):
     if p["mage"]:
         cv.create_rectangle(p["x"]-4, p["y"]-4, p["x"]+4, p["y"]+4, fill=p["col"], width=0)
