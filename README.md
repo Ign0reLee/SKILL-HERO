@@ -14,6 +14,7 @@ and your **pixel heroes — equipped with your skills (weapons & armor) — defe
 - 🎮 **Claude's work = a live battle** — linked to Claude via hooks. Every tool use chips the enemy's HP, and on `Stop` the heroes land a finishing blow → **CLEAR**
 - ⚔ **Equip skills as gear** — real skills like `autopilot · ultrawork · ralph · verify …` are drawn as swords/staves/armor/shields. **Drag** them onto a hero to equip (multiple skills orbit the hero as gems)
 - 🧙 **Multi-agent = multiple heroes** — spawning subagents (Task) adds class-based heroes (**knight · archer · mage**) that fight together
+- 🏆 **Level up & evolve** — the main hero gains a **level** for every Claude defeated (shown above its head, saved locally); **every 10 levels** = a fanfare, a new look, and tougher Claudes
 - 🖥 **Runs anywhere** — `/skill-hero` opens the visualizer in your **local browser**; works over **SSH/remote** via VS Code port-forwarding. Optional native desktop overlay for local use. Installs as a Claude Code **plugin** (hooks auto-apply)
 - 📦 **Zero dependencies** — browser / Python standard library only; runs as-is, no install
 
@@ -27,6 +28,9 @@ and your **pixel heroes — equipped with your skills (weapons & armor) — defe
 
 **Multi-agent — 에이전트가 늘면 동료가 합류** (more agents → more heroes)
 <p><img src="assets/overlay-agents.gif" alt="agents grow into companion heroes" width="820"></p>
+
+**Level up & evolve — 처치할수록 레벨업, 10레벨마다 진화** (Lv. above the hero; every 10 levels = fanfare + new look + tougher Claude)
+<p><img src="assets/overlay-level.gif" alt="main hero levels up and evolves every 10 levels" width="820"></p>
 
 ```
 skill-hero.html          ← Visualizer UI (served to your browser, or embedded as a widget)
@@ -170,6 +174,7 @@ echo '{"hook_event_name":"UserPromptSubmit"}' | python skill-hero-hook.py
 - 🎮 **Claude 작업 = 실시간 전투** — 훅으로 Claude 동작과 연동됩니다. 도구를 쓸수록 적 HP가 깎이고, 작업 종료(Stop) 시 일제히 마무리 일격 → **CLEAR**
 - ⚔ **스킬을 장비로 장착** — `autopilot · ultrawork · ralph · verify …` 등 실제 스킬을 검·지팡이·갑옷·방패로 시각화. 용사에게 **드래그**해 장착(여러 개는 주위를 도는 보석으로 표시)
 - 🧙 **멀티 에이전트 = 여러 용사** — 서브에이전트(Task)를 소환하면 직업별(**기사·궁수·법사**) 용사가 늘어나 함께 싸웁니다
+- 🏆 **레벨업 & 진화** — 클로드를 처치할 때마다 메인 용사가 **레벨업**(머리 위 표시·로컬 저장). **10레벨마다** 빵빠레 + 외견 진화 + 더 강한 클로드
 - 🖥 **어디서나 실행** — `/skill-hero` 가 **로컬 브라우저**로 비주얼라이저를 엽니다. **SSH/원격**도 VS Code 포트 포워딩으로 동작. 로컬 전용 네이티브 오버레이도 선택 제공. Claude Code **플러그인**으로 설치(훅 자동 적용)
 - 📦 **의존성 0** — 브라우저 / 파이썬 표준 라이브러리만으로 추가 설치 없이 바로 실행
 

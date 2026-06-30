@@ -175,16 +175,16 @@ function drawDots(g,ox,oy,cell,pal,reveal){
       o.fillStyle=col;o.fillRect(ox+x*cell,oy+y*cell,cell,cell);}}
 }
 /* Claude-shaped enemy: 도트 인베이더 (CLAUDE_G 그리드) */
-function drawClaude(cx,cy,cell,hit,dead){
+function drawClaude(cx,cy,cell,hit,dead,alpha){
   const g=CLAUDE_G, W=g[0].length, H=g.length;
   const wob=dead?0:Math.round(Math.sin(t/16)*1.5);
-  const ox=cx-W*cell/2, oy=cy-H*cell/2+wob;
+  const ox=cx-W*cell/2, oy=cy-H*cell/2+wob, A=alpha===undefined?1:alpha;
   for(let y=0;y<H;y++)for(let x=0;x<W;x++){
     const ch=g[y][x]; if(ch===".")continue;
     const col= ch==="W" ? COL.W : ((hit>0&&t%2===0)?"#ffd9c9":COL.C);
     let px=ox+x*cell, py=oy+y*cell;
-    o.globalAlpha=1;
-    if(dead){ py+=dead*dead*0.16; px+=(x<W/2?-1:1)*dead*0.5; o.globalAlpha=Math.max(0,1-dead/26); }
+    o.globalAlpha=A;
+    if(dead){ py+=dead*dead*0.16; px+=(x<W/2?-1:1)*dead*0.5; o.globalAlpha=A*Math.max(0,1-dead/26); }
     o.fillStyle=col; o.fillRect(px,py,cell,cell);
   }
   o.globalAlpha=1;
@@ -236,6 +236,21 @@ function drawHero(h){
   o.fillStyle="#0b1020cc";o.fillRect(hx-4,hy+12*cell+2,8*cell+8,9);
   o.fillStyle=COL.W;o.font="7px monospace";o.textAlign="center";
   o.fillText(h.name,hx+16,hy+12*cell+9);
+  // 메인 용사: 레벨 + 진화 외견(왕관·테두리 글로우)
+  if(h===heroes[0]){
+    const tr=tierOf(level), tc=TIERCOL[Math.min(tr,TIERCOL.length-1)];
+    if(tr>0){
+      o.globalAlpha=0.5+0.3*Math.sin(t/5);o.fillStyle=tc;
+      o.fillRect(hx-3,hy-4,8*cell+6,2);o.fillRect(hx-3,hy+12*cell+2,8*cell+6,2);
+      o.fillRect(hx-3,hy-4,2,12*cell+8);o.fillRect(hx+8*cell+3,hy-4,2,12*cell+8);
+      o.globalAlpha=1;
+      for(let k=0;k<Math.min(tr,4);k++){o.fillStyle=tc;o.fillRect(hx+5+k*7,hy-9,4,4);} // 왕관 보석
+      o.fillStyle=tc;o.fillRect(hx+2,hy-5,8*cell-4,2);                                  // 왕관 띠
+    }
+    o.fillStyle="#0b1020cc";o.fillRect(hx+1,hy-21,32,10);
+    o.fillStyle=tc;o.font="bold 8px monospace";o.textAlign="center";
+    o.fillText("Lv."+level,hx+17,hy-13);
+  }
 }
 /* ---------- floating texts ---------- */
 let pops=[];
@@ -252,6 +267,20 @@ let heroes=[], proj=[], enemy={hp:0,hpMax:100,alive:false,hit:0,dead:0,x:284,y:8
 let phase="idle", label="대기 중...";
 let mode="demo", t=0, banner=0, bannerTxt="";
 const SPAWN=22;   // 소환 모션 프레임 수
+/* ---------- 레벨/진화 (영구 저장) ---------- */
+let level=Math.max(1,parseInt(localStorage.getItem('skillhero_level'))||1);
+let kills=Math.max(0,parseInt(localStorage.getItem('skillhero_kills'))||0);
+let confetti=[];
+const TIERCOL=["#9aa6b2","#cd7f32","#d8dde6","#ffd700","#22d3ee","#f472b6","#a78bfa"]; // 티어별 색(브론즈→실버→골드…)
+const tierOf=l=>Math.floor(l/10);                 // 10레벨마다 티어 증가
+function saveProg(){try{localStorage.setItem('skillhero_level',level);localStorage.setItem('skillhero_kills',kills);}catch(e){}}
+function milestone(){                              // 10레벨마다: 빵빠레 + 진화
+  banner=Math.max(banner,160); bannerTxt="Lv."+level+"  ★ 진화 ★";
+  for(let i=0;i<48;i++) confetti.push({x:Math.random()*VW,y:-Math.random()*40,
+    vx:(Math.random()-0.5)*2.4,vy:1+Math.random()*2.2,
+    col:["#ffd166","#46e0a0","#7c9cff","#f472b6","#fde047","#22d3ee"][i%6],life:120});
+}
+function gainLevel(){ kills++; level++; saveProg(); if(level%10===0) milestone(); }
 function makeHero(i,cls){
   cls=cls||CLASS_KEYS[i%3];
   const c=CLASSES[cls], body=rnd(c.body), hat=rnd(c.hat), skin=rnd(SKINS);
@@ -270,7 +299,9 @@ function setHeroes(n){
   if(heroes.length>n)heroes.length=n;
   layout();
 }
-function spawnEnemy(hp){enemy.hpMax=hp||100;enemy.hp=enemy.hpMax;enemy.alive=true;enemy.dead=0;enemy.hit=0;proj=[];}
+function spawnEnemy(hp){const tr=tierOf(level);
+  enemy.hpMax=hp||(100+tr*40);enemy.hp=enemy.hpMax;enemy.alive=true;enemy.dead=0;enemy.hit=0;proj=[];
+  enemy.cell=5+Math.min(tr,3);}   // 티어마다 더 크고 단단한 클로드
 function attack(h,skill){
   if(!enemy.alive||h.atkT>0||h.spawnT>0)return;
   h.atkT=12;
@@ -310,7 +341,9 @@ function drawProj(){
   }
 }
 function victory(){enemy.dead=1;banner=120;bannerTxt="CLEAR!";
-  pop(enemy.x,enemy.y-44,"★ 결함 처치 ★","#46e0a0",true);}
+  pop(enemy.x,enemy.y-44,"★ 결함 처치 ★","#46e0a0",true);
+  gainLevel();   // 처치 → 메인 용사 레벨업(+10레벨마다 진화)
+  if(heroes[0]) pop(heroes[0].x+16,heroes[0].y-20,"LEVEL UP! Lv."+level,"#ffd166",true);}
 
 /* ---------- update & render ---------- */
 function update(){
@@ -319,6 +352,8 @@ function update(){
   updateProj();
   if(enemy.hit>0)enemy.hit--;
   if(enemy.dead>0){enemy.dead++; if(enemy.dead>26){enemy.alive=false;enemy.dead=0;proj=[];}}
+  for(const c of confetti){c.x+=c.vx;c.y+=c.vy;c.vy+=0.04;c.life--;}
+  confetti=confetti.filter(c=>c.life>0&&c.y<VH+12);
   if(banner>0)banner--;
   if(mode==="demo")demo();
   else if(enemy.alive&&!enemy.dead&&(phase==="thinking"||phase==="tool"||phase==="baking")&&t%18===0)ambientAttack();
@@ -358,16 +393,21 @@ function render(){
   o.fillStyle=phase==="done"?"#46e0a0":"#7c9cff";
   o.font="8px monospace";o.textAlign="left";
   o.fillText("◈ "+label,6,10);
+  o.textAlign="right";o.fillStyle="#ffd166";o.font="bold 8px monospace";
+  o.fillText("Lv."+level+" · 진화까지 "+(10-level%10),VW-6,10);
   // enemy + hp
   if(enemy.alive){
+    const tr=tierOf(level);
+    for(let k=Math.min(tr,3);k>=1;k--) drawClaude(enemy.x-16*k,enemy.y-8*k,Math.max(3,enemy.cell-1-k),0,0,0.22); // 뒤쪽 클로드 무리
     drawClaude(enemy.x,enemy.y,enemy.cell,enemy.hit,enemy.dead);
     if(!enemy.dead){
-      const bw=84,bx=enemy.x-bw/2,by=enemy.y-CLAUDE_HALF-14;
+      const half=CLAUDE_G.length*enemy.cell/2;
+      const bw=84,bx=enemy.x-bw/2,by=enemy.y-half-14;
       o.fillStyle="#0008";o.fillRect(bx-1,by-1,bw+2,7);
       o.fillStyle="#3a1212";o.fillRect(bx,by,bw,5);
       o.fillStyle="#ff5d5d";o.fillRect(bx,by,bw*(enemy.hp/enemy.hpMax),5);
       o.fillStyle=COL.W;o.font="7px monospace";o.textAlign="center";
-      o.fillText("CLAUDE  "+enemy.hp+"/"+enemy.hpMax,enemy.x,by-3);
+      o.fillText((tr>0?"CLAUDE ×"+(tr+1)+"  ":"CLAUDE  ")+enemy.hp+"/"+enemy.hpMax,enemy.x,by-3);
     }
   } else if(phase!=="idle"){
     o.fillStyle="#46e0a0";o.font="9px monospace";o.textAlign="center";
@@ -378,9 +418,11 @@ function render(){
   drawPops();
   if(banner>0){
     o.globalAlpha=Math.min(1,banner/20);
-    o.fillStyle="#46e0a0";o.font="bold 20px monospace";o.textAlign="center";
+    o.fillStyle=bannerTxt.indexOf("진화")>=0?"#ffd700":"#46e0a0";o.font="bold 20px monospace";o.textAlign="center";
     o.fillText(bannerTxt,VW/2,40);o.globalAlpha=1;
   }
+  for(const c of confetti){o.globalAlpha=Math.min(1,c.life/20);o.fillStyle=c.col;o.fillRect(c.x,c.y,3,3);}
+  o.globalAlpha=1;
   blit();
 }
 function blit(){
